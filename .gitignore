@@ -1,0 +1,17 @@
+.env
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+graphify-out/
+.model-cache/
+*.db-*
+*.sqlite*
+.env.*
+!.env.example
+.pytest_cache/
+evaluation/local/
+
+radar-worker*.json

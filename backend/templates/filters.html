@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Internship alerts{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Internship alerts</h1>
+  <p class="muted">Each active filter is checked on every poll. New postings that match get pushed to the channels you pick.</p>
+</div>
+<div class="panel" style="margin-bottom:24px">
+  <h2>Always watching for your next opportunity</h2>
+  <p>Checks are scheduled every 5 minutes. Delivery may be delayed by the scheduler or a source outage. Matching new roles go to your configured email or ntfy phone subscription.</p>
+  <p class="muted">{% if last_run %}Last check: {{last_run.started_at.strftime('%b %d, %H:%M')}} UTC · {{last_run.state}} · {{last_run.new_postings}} new roles{% else %}Waiting for the first recorded poll. Configure the scheduled worker to use the same database as this app.{% endif %}</p>
+  {% if not demo %}<p class="hint">Notification destinations are configured privately in the scheduled worker. Resume ranking changes the feed; alert filters below independently control notifications.</p>{% endif %}
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <form method="post" action="{{base_path}}/filters">
+      <h2 class="form-title">New filter</h2>
+
+      <div class="field">
+        <label>Name</label>
+        <input type="text" name="name" required placeholder="e.g. Chip design internships">
+      </div>
+
+      <div class="field">
+        <label>Sectors</label>
+        {% for key, label in sector_labels.items() %}
+        <label class="check">
+          <input type="checkbox" name="sectors" value="{{ key }}"> {{ label }}
+        </label>
+        {% endfor %}
+        <span class="hint">matches if any sector hits</span>
+      </div>
+
+      <div class="field">
+        <label>Keywords</label>
+        <input type="text" name="keywords" placeholder="fpga, verilog">
+        <span class="hint">comma separated; matches title/company/location</span>
+      </div>
+
+      <div class="field">
+        <label>Exclude keywords</label>
+        <input type="text" name="exclude_keywords" placeholder="sales, unpaid">
+      </div>
+
+      <div class="field">
+        <label>Locations</label>
+        <input type="text" name="locations" placeholder="Austin, Boston">
+      </div>
+
+      <div class="field">
+        <label class="check"><input type="checkbox" name="remote_only" value="true"> Remote only</label>
+      </div>
+
+      <div class="field">
+        <label>Alert channels</label>
+        <label class="check"><input type="checkbox" name="channels" value="email" checked> Email</label>
+        <label class="check"><input type="checkbox" name="channels" value="ntfy"> ntfy push</label>
+      </div>
+
+      <button type="submit" class="btn-primary">Create filter</button>
+    </form>
+  </aside>
+
+  <section class="results">
+    {% if not filters %}
+      <div class="empty">
+        <p>No filters yet.</p>
+        <p class="muted">Create one on the left to start receiving alerts.</p>
+      </div>
+    {% endif %}
+
+    <ul class="filter-list">
+      {% for f in filters %}
+      <li class="filter-card {% if not f.active %}inactive{% endif %}">
+        <div class="filter-head">
+          <span class="filter-name">{{ f.name }}</span>
+          <span class="pill {% if f.active %}pill-active{% endif %}">{{ 'Active' if f.active else 'Paused' }}</span>
+        </div>
+        <dl class="filter-detail">
+          {% if f.sectors | unpack %}
+          <div><dt>Sectors</dt><dd>{% for s in f.sectors | unpack %}<span class="tag">{{ sector_labels.get(s, s) }}</span>{% endfor %}</dd></div>
+          {% endif %}
+          {% if f.keywords | unpack %}
+          <div><dt>Keywords</dt><dd>{{ f.keywords | unpack | join(', ') }}</dd></div>
+          {% endif %}
+          {% if f.exclude_keywords | unpack %}
+          <div><dt>Excludes</dt><dd>{{ f.exclude_keywords | unpack | join(', ') }}</dd></div>
+          {% endif %}
+          {% if f.locations | unpack %}
+          <div><dt>Locations</dt><dd>{{ f.locations | unpack | join(', ') }}</dd></div>
+          {% endif %}
+          {% if f.remote_only %}
+          <div><dt>Remote</dt><dd>remote only</dd></div>
+          {% endif %}
+          <div><dt>Channels</dt><dd>{{ f.channels | unpack | join(', ') or 'email' }}</dd></div>
+        </dl>
+        <div class="filter-actions">
+          <form method="post" action="{{base_path}}/filters/{{ f.id }}/toggle">
+            <button type="submit">{{ 'Pause' if f.active else 'Resume' }}</button>
+          </form>
+          <form method="post" action="{{base_path}}/filters/{{ f.id }}/delete"
+                onsubmit="return confirm('Delete this filter?')">
+            <button type="submit" class="btn-danger">Delete</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+<section class="panel" style="margin-top:24px"><h2>Recent alert deliveries</h2>
+{% for delivery,title,filter_name in deliveries %}<div class="filter-card"><strong>{{title}}</strong><p>{{filter_name}} · {{delivery.channel}} · {{delivery.state}} · {{delivery.attempts}} attempt{{'s' if delivery.attempts != 1 else ''}}</p><small>{{delivery.created_at.strftime('%b %d, %H:%M')}} UTC</small></div>{% else %}<p class="muted">No deliveries recorded yet. Matching roles appear here when the worker queues them.</p>{% endfor %}</section>
+{% endblock %}
